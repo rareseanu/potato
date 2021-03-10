@@ -8,6 +8,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <errno.h>
+
 typedef struct debugger_t {
     breakpoint_t *breakpoints;
     char *child_program_name;

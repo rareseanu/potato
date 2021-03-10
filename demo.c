@@ -8,9 +8,7 @@ int main(int argc, char* argv[]) {
     
     char* programArgs[] = { argv[1], (char*) 0 };
     debugger_t debugger;
-    initialize_debugger(0, &debugger, argv[1]);
-    //debugger.child_program_name = argv[1];
-    printf("\n\n\n %s", debugger.child_program_name); 
+    initialize_debugger(1, &debugger, argv[1]);
     // fork() - create an exact copy (child process)  of this calling 
     // process which runs concurrently with the parent. 
     pid_t pid = fork();
