@@ -1,12 +1,5 @@
 #include "debugger.h"
 
-void dump(long data) {
-    for(int i = 0; i < 64; i += 8) {
-        printf("%02x ", ((unsigned long) data >> i) & 0xff);
-    }
-}
-
-
 int main(int argc, char* argv[]) {
     if(argc < 2) {
         printf("ERROR: Specify the program name.\n");
@@ -15,8 +8,9 @@ int main(int argc, char* argv[]) {
     
     char* programArgs[] = { argv[1], (char*) 0 };
     debugger_t debugger;
-    debugger.child_program_name = argv[1];
-     
+    initialize_debugger(0, &debugger, argv[1]);
+    //debugger.child_program_name = argv[1];
+    printf("\n\n\n %s", debugger.child_program_name); 
     // fork() - create an exact copy (child process)  of this calling 
     // process which runs concurrently with the parent. 
     pid_t pid = fork();

@@ -1,7 +1,8 @@
 #include <stdbool.h>
 
 typedef struct breakpoint_t {
-    unsigned long addr;
+    unsigned long long addr;
+    unsigned long long word_before_bp;
     bool enabled;
 } breakpoint_t;
 

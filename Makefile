@@ -1,7 +1,7 @@
 CC = gcc
 
-TARGET = debugger
-OBJS = debugger.o
+TARGET = demo
+OBJS = demo.o breakpoint.o debugger.o
 REBUILDABLES = $(OBJS) $(TARGET) 
 
 clean:
@@ -17,3 +17,6 @@ $(TARGET): $(OBJS)
 %.0: %.c
 	$(CC) -Wall -g -o $@ $<
 
+demo.o : debugger.h breakpoint.h
+debugger.o : debugger.h breakpoint.h
+breakpoint.o : breakpoint.h
