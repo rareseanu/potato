@@ -24,8 +24,8 @@ void initialize_debugger(size_t initial_size, debugger_t *debugger,
 int initiate_child_trace(const debugger_t *debugger, 
         char** child_process_args);
 void dump(long data);
+
 int run_debugger(debugger_t *debugger);
-void add_breakpoint(debugger_t *debugger, unsigned long long addr);
-void delete_breakpoint(debugger_t *debugger, unsigned long long addr);
+int add_breakpoint(debugger_t *debugger, unsigned long long addr);
 
 

@@ -17,10 +17,11 @@ int main(int argc, char* argv[]) {
         return -1;
     } else if(pid == 0) {
         // Child process. 
+        personality(ADDR_NO_RANDOMIZE);
         initiate_child_trace(&debugger, programArgs);    
     } else {
         // Parent (debugger) process.
-        debugger.child_pid = pid;    
+        debugger.child_pid = pid;
         run_debugger(&debugger); 
     }
 }
