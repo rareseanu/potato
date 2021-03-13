@@ -11,6 +11,11 @@ void initialize_debugger(size_t initial_breakpoints_size
     debugger->max_breakpoints = initial_breakpoints_size;
 }
 
+void clean_debugger(debugger_t *debugger) {
+    free(debugger->child_program_name);
+    free(debugger->breakpoints);
+}
+
 void read_elf_header(const char* elfFile, debugger_t *debugger) {
     FILE* file = fopen(elfFile, "rb");
     Elf64_Ehdr elf_header;
@@ -153,19 +158,21 @@ int run_debugger(debugger_t *debugger) {
                 disable_breakpoint(debugger->child_pid, bp);
             }
             continue;
+        } else if(strcmp(command, "exit") == 0) {
+            exit(0);
         }
 
         if(WSTOPSIG(status) == SIGTRAP && WIFSTOPPED(status)) {
             if(strcmp(command, "next") == 0) {
                 if(disable_last_bp) {
-                    disable_last_bp = false;
-                    enable_breakpoint(debugger->child_pid, bp);
                     if(ptrace(PTRACE_SINGLESTEP, debugger->child_pid
                                 , NULL, NULL) < 0) {
                         printf("\nERROR: ptrace() SINGLESTEP failure.");
                         continue;
                     }
                     waitpid(debugger->child_pid, &status, 0);
+                    disable_last_bp = false;
+                    enable_breakpoint(debugger->child_pid, bp);
                 } 
 
                 if(ptrace(PTRACE_SINGLESTEP, debugger->child_pid

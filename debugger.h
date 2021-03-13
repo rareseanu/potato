@@ -28,6 +28,7 @@ void read_load_address(debugger_t *debugger);
 
 void initialize_debugger(size_t initial_size, debugger_t *debugger,
         const char* program_name);
+void clean_debugger(debugger_t *debugger);
 int initiate_child_trace(const debugger_t *debugger, 
         char** child_process_args);
 void dump(long data);
