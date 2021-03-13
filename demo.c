@@ -5,7 +5,7 @@ int main(int argc, char* argv[]) {
         printf("ERROR: Specify the program name.\n");
         return -1;
     }
-    
+
     char* programArgs[] = { argv[1], (char*) 0 };
     debugger_t debugger;
     initialize_debugger(1, &debugger, argv[1]);

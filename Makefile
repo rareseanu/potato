@@ -1,7 +1,7 @@
-CC = gcc
+CC = gcc -lelf -ldwarf -I /usr/include/libdwarf
 
 TARGET = demo
-OBJS = demo.o breakpoint.o debugger.o
+OBJS = demo.o breakpoint.o debugger.o dwarf_utils.o
 REBUILDABLES = $(OBJS) $(TARGET) 
 
 clean:
@@ -19,4 +19,5 @@ $(TARGET): $(OBJS)
 
 demo.o : debugger.h breakpoint.h
 debugger.o : debugger.h breakpoint.h
-breakpoint.o : breakpoint.h
+breakpoint.o : breakpoint.h dwarf_utils.h
+dwarf_utils.o : dwarf_utils.h

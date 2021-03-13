@@ -33,7 +33,6 @@ void read_load_address(debugger_t *debugger) {
     if(file) {
         fscanf(file, "%llx", &address);
         debugger->load_address = address;
-        printf("\nAFter read: %llx", debugger->load_address);
     }
 }
 
@@ -87,12 +86,6 @@ int initiate_child_trace(const debugger_t *debugger,
     execve(debugger->child_program_name, child_process_args, NULL);
 }
 
-void dump(long data) {
-    for(int i = 0; i < 64; i+= 8) {
-        printf("%02x ", ((long long) data >> i) & 0xff);
-    }
-}
-
 breakpoint_t* get_breakpoint(const debugger_t *debugger,
         unsigned long long address) {
     for(int i = 0; i < debugger->number_of_breakpoints; ++i) {
@@ -130,25 +123,35 @@ int run_debugger(debugger_t *debugger) {
         scanf("%s", command);
 
         // ptrace() - observe/control the execution of another process 
-        if(strcmp(command, "info_rip") == 0) {
-            ptrace(PTRACE_GETREGS, debugger->child_pid, NULL, &registers);
-            ptrace(PTRACE_PEEKUSER, debugger->child_pid
-                    ,registers.rip, 0);
-            printf("\n[RIP] %lx : ", registers.rip);
+        if(strcmp(command, "reg") == 0) {
+            char reg[4];
+            printf("\nEnter the register name: ");
+            scanf("%3s", reg);
+            printf("\n[%s] %llx : ",reg, get_register_value(debugger, reg));
             continue;
             //dump((unsigned long) ptrace(PTRACE_PEEKTEXT, pid, registers.rip, 0)
-        } else if(strcmp(command, "breakpoint") == 0) {
+        } else if(strcmp(command, "address_bp") == 0) {
             unsigned long long address;
-            printf("\nEnter the address without \"0x\":  ");
+            printf("\nEnter the address without \"0x\": ");
             scanf("%llx", &address);
 
             add_breakpoint(debugger, address);
+            continue;
+        } else if(strcmp(command, "function_bp") == 0) {
+            printf("\nEnter the function name: ");
+            char function_name[128];
+            scanf("%127s", function_name);
+            add_breakpoint(debugger, 
+                process_cu(debugger->child_program_name, function_name));
             continue;
         } else if(strcmp(command, "disable_bp") == 0) {
             unsigned long long address;
             printf("\nEnter the address without \"0x\": ");
             scanf("%x", &address);
-            //disable_breakpoint(debugger, address);
+            breakpoint_t *bp = get_breakpoint(debugger, address);
+            if(bp != NULL) {
+                disable_breakpoint(debugger->child_pid, bp);
+            }
             continue;
         }
 
@@ -218,5 +221,3 @@ int run_debugger(debugger_t *debugger) {
         }
     }
 }
-
-
