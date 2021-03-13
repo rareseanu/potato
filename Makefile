@@ -1,4 +1,4 @@
-CC = gcc -lelf -ldwarf -I /usr/include/libdwarf
+CC = gcc -ldwarf -I /usr/include/libdwarf
 
 TARGET = demo
 OBJS = demo.o breakpoint.o debugger.o dwarf_utils.o

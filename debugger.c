@@ -163,7 +163,7 @@ int run_debugger(debugger_t *debugger) {
         }
 
         if(WSTOPSIG(status) == SIGTRAP && WIFSTOPPED(status)) {
-            if(strcmp(command, "next") == 0) {
+            if(strcmp(command, "step") == 0) {
                 if(disable_last_bp) {
                     if(ptrace(PTRACE_SINGLESTEP, debugger->child_pid
                                 , NULL, NULL) < 0) {
