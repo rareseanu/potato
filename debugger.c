@@ -11,30 +11,45 @@ void initialize_debugger(size_t initial_breakpoints_size
     debugger->max_breakpoints = initial_breakpoints_size;
 }
 
-int enable_breakpoint(const debugger_t *debugger, breakpoint_t *breakpoint) {
-
-    //Save the word so we can run the original instruction after 
-    //disabling the breakpoint.
-    breakpoint->word_before_bp = ptrace(PTRACE_PEEKDATA, debugger->child_pid,
-            breakpoint->addr, 0);
-    printf("\n\tBefore breakpoint enable: %016x", ptrace(PTRACE_PEEKDATA, 
-                debugger->child_pid, breakpoint->addr, NULL));  
-
-    //0xcc - INT 3 opcode (software breakpoint)
-    //apply the mask on the word so it takes all but the first byte
-    //replace the first byte with INT 3 opcode  
-    if(ptrace(PTRACE_POKEDATA, debugger->child_pid, breakpoint->addr,
-                ((breakpoint->word_before_bp & ~0xff) | 0xcc)) < 0) {
-        printf("\n%d", debugger->child_pid);
-        printf("\nERROR: ptrace() POKEDATA failure: %s\n", strerror(errno));
-        return -1;
+void read_elf_header(const char* elfFile, debugger_t *debugger) {
+    FILE* file = fopen(elfFile, "rb");
+    Elf64_Ehdr elf_header;
+    if(file) {
+        fread(&elf_header, 1, sizeof(elf_header), file);
+        if (memcmp(elf_header.e_ident, ELFMAG, SELFMAG) == 0) {
+            debugger->elf_header = elf_header;
+        }
+        fclose(file);
     }
-
-    printf("\n\tAfter breakpoint enable: %016x\n", ptrace(PTRACE_PEEKDATA, 
-                debugger->child_pid, breakpoint->addr, NULL) );
-    return 0;  
+}
+// Only for PIE 
+void read_load_address(debugger_t *debugger) {
+    char file_location[128];
+    sprintf(file_location, "/proc/%d/maps", debugger->child_pid);
+    printf("%s", file_location);
+    FILE* file = fopen(file_location, "rb");
+    long long address;
+    int c;
+    if(file) {
+        fscanf(file, "%llx", &address);
+        debugger->load_address = address;
+        printf("\nAFter read: %llx", debugger->load_address);
+    }
 }
 
+unsigned long long get_register_value(const debugger_t *debugger, 
+        char* reg) {
+    struct user_regs_struct registers;
+    if(ptrace(PTRACE_GETREGS, debugger->child_pid, NULL, &registers)) {
+        printf("\nERROR: ptrace() GETREGS failure.");
+        return 0;
+    }
+    if(strcmp(reg, "rip") == 0) {
+        return registers.rip;
+    } else if(strcmp(reg, "orig_rax") == 0) {
+        return registers.orig_rax;
+    }
+}
 
 int add_breakpoint(debugger_t *debugger, unsigned long long addr) {
     if(debugger->number_of_breakpoints == debugger->max_breakpoints) {
@@ -49,66 +64,17 @@ int add_breakpoint(debugger_t *debugger, unsigned long long addr) {
     }
     breakpoint_t* breakpoint = (breakpoint_t*)malloc(sizeof(breakpoint_t));
     breakpoint->number = debugger->number_of_breakpoints;
-    breakpoint->addr = addr;
+    if(debugger->elf_header.e_type == ET_EXEC) {
+        //No-pie
+        breakpoint->addr = addr;
+    } else {
+        breakpoint->addr = addr + debugger->load_address;
+    }
     breakpoint->word_before_bp = ptrace(PTRACE_PEEKDATA, debugger->child_pid,
-            addr, 0);
+            breakpoint->addr , 0);
     debugger->breakpoints[debugger->number_of_breakpoints++] = *breakpoint;
 
-    enable_breakpoint(debugger, breakpoint);
-    return 0;
-}
-
-
-
-unsigned long long get_register_value(const debugger_t *debugger, 
-        char* reg) {
-    struct user_regs_struct registers;
-    if(ptrace(PTRACE_GETREGS, debugger->child_pid, NULL, &registers)) {
-        printf("\nERROR: ptrace() GETREGS failure.");
-        return 0;
-    }
-    if(strcmp(reg, "rip") == 0) {
-        return registers.rip;
-    } else if(strcmp(reg, "orig_rax") == 0) {
-        return registers.orig_rax;
-    }
-
-}
-
-int disable_breakpoint(debugger_t *debugger, breakpoint_t *breakpoint) {
-
-    struct user_regs_struct registers;
-    if(ptrace(PTRACE_GETREGS, debugger->child_pid, NULL, &registers) <0) {
-        printf("\nERROR: ptrace GETREGS failure.");   
-        return -1;
-    }
-
-    //The instruction pointer now points to the instruction after
-    //the trap so we need to change it to point to the 
-    //original instruction that we will replace back.
-    registers.rip = breakpoint->addr;
-    if(ptrace(PTRACE_SETREGS, debugger->child_pid, NULL, &registers) < 0) {
-        printf("\nERROR: ptrace SETREGS failure.");
-        return -1;
-    }
-
-    printf("\n\tBefore breakpoint disable: %016x", ptrace(PTRACE_PEEKDATA, 
-                debugger->child_pid, breakpoint->addr, NULL) );
-
-    unsigned long long data_with_int3 = ptrace(PTRACE_PEEKTEXT
-            , debugger->child_pid, breakpoint->addr, 0); 
-    //Apply the mask on the so it takes all but the first byte that contains
-    //INT 3 (0xCC) and replace it with the first byte of the original instruction.
-    unsigned long long constructed_back = (data_with_int3 & ~0xff) 
-        | (breakpoint->word_before_bp & 0xff);
-
-    if(ptrace(PTRACE_POKETEXT, debugger->child_pid, breakpoint->addr,
-                constructed_back) < 0) {
-        printf("\nERROR: ptrace POKEDATA\n");
-        return -1;
-    }
-    printf("\n\tAfter breakpoint disable: %016x", ptrace(PTRACE_PEEKDATA, 
-                debugger->child_pid, breakpoint->addr, NULL));
+    enable_breakpoint(debugger->child_pid, breakpoint);
     return 0;
 }
 
@@ -149,6 +115,8 @@ int run_debugger(debugger_t *debugger) {
     unsigned long long rip = 0;
     // waitpid() - wait for state changes in the given child process
     waitpid(debugger->child_pid, &status, 0);
+    read_load_address(debugger);
+
     while(1) {
         if(WIFEXITED(status)) {
             printf("\nChild process exited with code %d\n", WEXITSTATUS(status));
@@ -188,7 +156,7 @@ int run_debugger(debugger_t *debugger) {
             if(strcmp(command, "next") == 0) {
                 if(disable_last_bp) {
                     disable_last_bp = false;
-                    enable_breakpoint(debugger, bp);
+                    enable_breakpoint(debugger->child_pid, bp);
                     if(ptrace(PTRACE_SINGLESTEP, debugger->child_pid
                                 , NULL, NULL) < 0) {
                         printf("\nERROR: ptrace() SINGLESTEP failure.");
@@ -219,7 +187,7 @@ int run_debugger(debugger_t *debugger) {
                     }
 
                     disable_last_bp = false;
-                    enable_breakpoint(debugger, bp);
+                    enable_breakpoint(debugger->child_pid, bp);
                 }
 
                 if(ptrace(PTRACE_CONT, debugger->child_pid, NULL, NULL) < 0) {
@@ -243,7 +211,7 @@ int run_debugger(debugger_t *debugger) {
             bp = get_breakpoint(debugger, rip - 1); 
             if(bp != NULL) {
                 printf("\nBreakpoint %d at RIP: %llx\n",bp->number, rip-1);
-                disable_breakpoint(debugger, bp);
+                disable_breakpoint(debugger->child_pid, bp);
                 disable_last_bp = true;
             } 
 

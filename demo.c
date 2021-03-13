@@ -9,6 +9,8 @@ int main(int argc, char* argv[]) {
     char* programArgs[] = { argv[1], (char*) 0 };
     debugger_t debugger;
     initialize_debugger(1, &debugger, argv[1]);
+    read_elf_header(argv[1], &debugger);
+    
     // fork() - create an exact copy (child process)  of this calling 
     // process which runs concurrently with the parent. 
     pid_t pid = fork();
@@ -16,7 +18,8 @@ int main(int argc, char* argv[]) {
         printf("ERROR: Unsuccessful fork() call.\n");
         return -1;
     } else if(pid == 0) {
-        // Child process. 
+        // Child process.
+        // Disable address space layout randomization
         personality(ADDR_NO_RANDOMIZE);
         initiate_child_trace(&debugger, programArgs);    
     } else {
